@@ -32,3 +32,8 @@ go.work.sum
 *.ipr
 *.iws
 
+# custom folders and files
+/.claude/
+/dockship
+/config.yaml
+dockship

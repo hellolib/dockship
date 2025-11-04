@@ -1,42 +1,48 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
-/*
-cobra-cli 生成的脚手架代码
-*/
+var (
+	// 全局配置文件路径
+	cfgFile string
+)
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd 根命令
 var rootCmd = &cobra.Command{
 	Use:   "dockship",
-	Short: "一个轻量级 Docker 镜像分发工具。",
-	Long:  `一个轻量级 Docker 镜像分发工具，用于在没有镜像仓库的环境下，高效地将本地或远程镜像传输到多台目标主机，并在远端自动执行 docker load 。`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Short: "🚢 Dockship - Docker镜像分发工具",
+	Long: `Dockship 是一个轻量级 Docker 镜像分发工具。
+
+用于在没有镜像仓库（registry）的环境下，高效地将本地或远程镜像
+传输到多台目标主机，并在远端自动执行 docker load。
+
+支持的功能：
+  • 镜像自动获取（本地/远程）
+  • 多主机并发分发
+  • SSH安全传输
+  • 自动加载镜像
+  • 失败重试机制`,
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Execute 执行根命令
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+	// 定义全局标志
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "config.yaml", "配置文件路径")
+}
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dockship.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+// GetConfigFile 获取配置文件路径
+func GetConfigFile() string {
+	return cfgFile
 }

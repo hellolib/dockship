@@ -1,0 +1,47 @@
+# Docker镜像列表
+images:
+  - nginx:1.25
+  - redis:7.0
+
+# 目标主机列表
+target_hosts:
+  - 192.168.1.10
+  - 192.168.1.11
+
+# SSH连接配置
+ssh:
+  user: root
+  pwd: your_user_password        # SSH密码（不推荐，建议使用密钥）
+  # key_file: ~/.ssh/id_rsa      # SSH密钥文件路径（推荐）
+  port: 22                        # SSH端口
+  timeout: 30                     # 连接超时时间（秒）
+
+# 本地存储配置
+local_storage:
+  temp_dir: /tmp/dockship         # 本地临时文件目录
+  auto_cleanup: true             # 传输完成后是否自动清理本地临时文件
+
+# 远程存储配置
+remote_storage:
+  temp_dir: /tmp/dockship          # 远程主机临时文件目录
+  auto_cleanup: true              # 镜像加载完成后是否自动清理远程临时文件
+
+# 传输配置
+transfer:
+  concurrent: 5                   # 并发传输主机数量
+  retry: 3                        # 失败重试次数
+
+
+# Hooks配置（对所有镜像和主机生效）
+hooks:
+  # 镜像加载前执行（在docker load之前）
+  pre_load:
+#    - echo "准备加载镜像..."
+#    - docker images | tail -5
+
+  # 镜像加载后执行（在docker load之后）
+  post_load:
+#    - echo "镜像加载完成"
+#    - docker images | tail -5
+    # 示例：更新Swarm服务
+    # - docker service update --image <镜像名> <服务名>
