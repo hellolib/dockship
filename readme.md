@@ -24,10 +24,44 @@
 
 ### 编译安装
 
+**方式 1：使用 Makefile（推荐）**
+
+```bash
+git clone https://github.com/hellolib/dockship.git
+cd dockship
+make build
+```
+
+Makefile 会自动注入版本信息（Git commit、构建时间等）。
+
+**方式 2：直接使用 go build**
+
 ```bash
 git clone https://github.com/hellolib/dockship.git
 cd dockship
 go build -o dockship
+```
+
+### Makefile 命令
+
+```bash
+make build    # 编译项目
+make clean    # 清理编译产物
+make install  # 安装到 $GOPATH/bin
+make version  # 显示版本信息
+make run      # 编译并运行
+make help     # 显示帮助信息
+```
+
+### 查看版本
+
+```bash
+# 查看详细版本信息
+./dockship version
+
+# 或使用标志
+./dockship --version
+./dockship -v
 ```
 
 ---

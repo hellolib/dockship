@@ -14,8 +14,9 @@ var (
 
 // rootCmd 根命令
 var rootCmd = &cobra.Command{
-	Use:   "dockship",
-	Short: "🚢 Dockship - Docker镜像分发工具",
+	Use:     "dockship",
+	Short:   "🚢 Dockship - Docker镜像分发工具",
+	Version: Version, // 设置版本号，支持 --version 标志
 	Long: `Dockship 是一个轻量级 Docker 镜像分发工具。
 
 用于在没有镜像仓库（registry）的环境下，高效地将本地或远程镜像
