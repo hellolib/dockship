@@ -4,6 +4,13 @@
 
 ---
 
+## 🎯 使用场景
+
+1. **无外网环境部署**：内网环境无法访问 Docker Hub 或私有仓库
+2. **快速批量分发**：需要将镜像快速分发到多台主机
+
+---
+
 ## ✨ 功能特性
 
 - ✅ **镜像自动获取**：支持从本地或远程拉取镜像
@@ -127,9 +134,13 @@ hooks:
 ```bash
 # 使用默认配置文件 config.yaml
 ./dockship transfer
+# 或使用简短别名
+./dockship go
 
 # 使用自定义配置文件
 ./dockship transfer -c custom.yaml
+# 或
+./dockship go -c custom.yaml
 ```
 
 ### 3️⃣ 运行示例
@@ -277,16 +288,6 @@ local_storage:
 remote_storage:
   auto_cleanup: true   # 镜像加载后自动删除远程 tar 文件
 ```
-
----
-
-## 🎯 使用场景
-
-1. **无外网环境部署**：内网环境无法访问 Docker Hub 或私有仓库
-2. **快速批量分发**：需要将镜像快速分发到多台主机
-3. **Docker Swarm 更新**：配合 hooks 自动更新 Swarm 服务
-4. **离线环境部署**：完全离线的生产环境
-5. **临时镜像分发**：测试环境快速分发镜像
 
 ---
 

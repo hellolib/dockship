@@ -12,8 +12,9 @@ import (
 
 // transferCmd 传输命令
 var transferCmd = &cobra.Command{
-	Use:   "transfer",
-	Short: "传输Docker镜像到目标主机",
+	Use:     "transfer",
+	Aliases: []string{"go"},
+	Short:   "传输Docker镜像到目标主机",
 	Long: `读取配置文件中的镜像列表和目标主机列表，
 自动执行以下操作：
   1. 检查本地镜像，不存在则从远程拉取
@@ -24,6 +25,7 @@ var transferCmd = &cobra.Command{
 
 示例：
   dockship transfer                    # 使用默认配置文件 config.yaml
+  dockship go                          # 等同于 transfer，更简短的别名
   dockship transfer -c custom.yaml     # 使用自定义配置文件`,
 	RunE: runTransfer,
 }
