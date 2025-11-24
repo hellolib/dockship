@@ -26,7 +26,8 @@ var transferCmd = &cobra.Command{
 示例：
   dockship transfer                    # 使用默认配置文件 config.yaml
   dockship go                          # 等同于 transfer，更简短的别名
-  dockship transfer -c custom.yaml     # 使用自定义配置文件`,
+  dockship transfer -c custom.yaml     # 使用自定义配置文件
+  dockship go -c custom.yaml     # 使用自定义配置文件`,
 	RunE: runTransfer,
 }
 
