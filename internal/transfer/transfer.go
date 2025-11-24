@@ -35,6 +35,17 @@ type TransferResult struct {
 	Error   error  // 错误信息
 }
 
+type preparedImage struct {
+	Image   string
+	TarFile string
+	Err     error
+}
+
+type imagePipelineResult struct {
+	Image string
+	Err   error
+}
+
 // Start 启动传输任务
 func (m *Manager) Start() error {
 	fmt.Println("🚀 Dockship 开始执行镜像传输任务")
@@ -47,14 +58,71 @@ func (m *Manager) Start() error {
 
 	startTime := time.Now()
 
-	// 对每个镜像执行传输
-	for _, image := range m.cfg.Images {
-		fmt.Printf("\n📦 处理镜像: %s\n", image)
-		fmt.Println(strings.Repeat("-", 60))
+	imageCount := len(m.cfg.Images)
+	if imageCount == 0 {
+		return nil
+	}
 
-		if err := m.processImage(image); err != nil {
-			fmt.Printf("❌ 镜像 %s 处理失败: %v\n", image, err)
-			continue
+	concurrency := m.cfg.Transfer.Concurrent
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+
+	imageCh := make(chan string)
+	preparedCh := make(chan preparedImage, imageCount)
+	resultCh := make(chan imagePipelineResult, imageCount)
+
+	var prepareWg sync.WaitGroup
+	for i := 0; i < concurrency; i++ {
+		prepareWg.Add(1)
+		go func() {
+			defer prepareWg.Done()
+			for image := range imageCh {
+				tarFile, err := m.dockerClient.PrepareImage(image)
+				preparedCh <- preparedImage{
+					Image:   image,
+					TarFile: tarFile,
+					Err:     err,
+				}
+			}
+		}()
+	}
+
+	go func() {
+		prepareWg.Wait()
+		close(preparedCh)
+	}()
+
+	go func() {
+		for _, image := range m.cfg.Images {
+			imageCh <- image
+		}
+		close(imageCh)
+	}()
+
+	var transferWg sync.WaitGroup
+	for i := 0; i < concurrency; i++ {
+		transferWg.Add(1)
+		go func() {
+			defer transferWg.Done()
+			for prepared := range preparedCh {
+				err := m.handlePreparedImage(prepared)
+				resultCh <- imagePipelineResult{
+					Image: prepared.Image,
+					Err:   err,
+				}
+			}
+		}()
+	}
+
+	go func() {
+		transferWg.Wait()
+		close(resultCh)
+	}()
+
+	for res := range resultCh {
+		if res.Err != nil {
+			fmt.Printf("❌ 镜像 %s 处理失败: %v\n", res.Image, res.Err)
 		}
 	}
 
@@ -65,35 +133,38 @@ func (m *Manager) Start() error {
 	return nil
 }
 
-// processImage 处理单个镜像的传输
-func (m *Manager) processImage(image string) error {
-	// 1. 准备镜像（确保存在 + 保存为tar）
-	tarFile, err := m.dockerClient.PrepareImage(image)
-	if err != nil {
-		return fmt.Errorf("准备镜像失败: %w", err)
+func (m *Manager) handlePreparedImage(prepared preparedImage) error {
+	if prepared.Err != nil {
+		return prepared.Err
 	}
 
-	// 如果配置了自动清理，在函数结束时清理tar文件
+	if prepared.TarFile == "" {
+		return fmt.Errorf("镜像 %s 的 tar 文件不存在", prepared.Image)
+	}
+
 	if m.cfg.LocalStorage.AutoCleanup {
-		defer func() {
-			if err := m.dockerClient.CleanupTarFile(tarFile); err != nil {
+		defer func(tarPath string) {
+			if err := m.dockerClient.CleanupTarFile(tarPath); err != nil {
 				fmt.Printf("⚠️  清理tar文件失败: %v\n", err)
 			}
-		}()
+		}(prepared.TarFile)
 	}
 
-	// 2. 创建多进度条容器（设置刷新间隔为120ms）
+	return m.transferPreparedImage(prepared.Image, prepared.TarFile)
+}
+
+func (m *Manager) transferPreparedImage(image, tarFile string) error {
+	fmt.Printf("\n📦 处理镜像: %s\n", image)
+	fmt.Println(strings.Repeat("-", 60))
+
 	progress := mpb.New(
 		mpb.WithRefreshRate(120 * time.Millisecond),
 	)
 
-	// 3. 并发传输到多个目标主机
 	results := m.transferToHosts(image, tarFile, progress)
 
-	// 4. 等待所有进度条完成
 	progress.Wait()
 
-	// 5. 输出每个主机的处理结果
 	fmt.Println()
 	for _, result := range results {
 		if result.Success {
@@ -103,7 +174,6 @@ func (m *Manager) processImage(image string) error {
 		}
 	}
 
-	// 6. 统计结果
 	success := 0
 	failed := 0
 	for _, result := range results {

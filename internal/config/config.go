@@ -35,7 +35,7 @@ type StorageConfig struct {
 
 // TransferConfig 传输配置
 type TransferConfig struct {
-	Concurrent int `mapstructure:"concurrent"` // 并发传输主机数量
+	Concurrent int `mapstructure:"concurrent"` // 并发传输主机数量，也用于镜像并发
 	Retry      int `mapstructure:"retry"`      // 失败重试次数
 }
 
@@ -115,6 +115,10 @@ func (c *Config) Validate() error {
 
 	if c.SSH.Port <= 0 || c.SSH.Port > 65535 {
 		return fmt.Errorf("SSH端口无效: %d", c.SSH.Port)
+	}
+
+	if c.Transfer.Concurrent <= 0 {
+		c.Transfer.Concurrent = 1
 	}
 
 	return nil
