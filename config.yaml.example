@@ -30,6 +30,7 @@ remote_storage:
 transfer:
   concurrent: 5                   # 并发传输主机数量
   retry: 3                        # 失败重试次数
+  auto_load: true                 # 是否在远程主机自动加载镜像
 
 
 # Hooks配置（对所有镜像和主机生效）

@@ -281,15 +281,17 @@ func (m *Manager) doTransfer(host, image, tarFile string, progress *mpb.Progress
 		// hooks失败不影响主流程，继续执行
 	}
 
-	// 6. 加载Docker镜像
-	if err := sshClient.LoadDockerImage(remoteTarPath); err != nil {
-		return err
-	}
+	// 6. 根据配置决定是否加载Docker镜像
+	if m.cfg.Transfer.AutoLoad {
+		if err := sshClient.LoadDockerImage(remoteTarPath); err != nil {
+			return err
+		}
 
-	// 7. 执行post_load hooks（镜像加载后）
-	if len(m.cfg.Hooks.PostLoad) > 0 {
-		sshClient.ExecuteHooks("post_load", m.cfg.Hooks.PostLoad)
-		// hooks失败不影响主流程，继续执行
+		// 7. 执行post_load hooks（镜像加载后）
+		if len(m.cfg.Hooks.PostLoad) > 0 {
+			sshClient.ExecuteHooks("post_load", m.cfg.Hooks.PostLoad)
+			// hooks失败不影响主流程，继续执行
+		}
 	}
 
 	// 8. 根据配置决定是否清理远程tar文件

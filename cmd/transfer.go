@@ -72,6 +72,7 @@ func printConfigInfo(cfg *config.Config) {
 	}
 	fmt.Printf("  并发数: %d\n", cfg.Transfer.Concurrent)
 	fmt.Printf("  重试次数: %d\n", cfg.Transfer.Retry)
+	fmt.Printf("  自动加载镜像: %v\n", cfg.Transfer.AutoLoad)
 	fmt.Printf("  SSH用户: %s\n", cfg.SSH.User)
 	fmt.Printf("  SSH端口: %d\n", cfg.SSH.Port)
 

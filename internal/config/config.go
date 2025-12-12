@@ -35,8 +35,9 @@ type StorageConfig struct {
 
 // TransferConfig 传输配置
 type TransferConfig struct {
-	Concurrent int `mapstructure:"concurrent"` // 并发传输主机数量，也用于镜像并发
-	Retry      int `mapstructure:"retry"`      // 失败重试次数
+	Concurrent int  `mapstructure:"concurrent"` // 并发传输主机数量，也用于镜像并发
+	Retry      int  `mapstructure:"retry"`      // 失败重试次数
+	AutoLoad   bool `mapstructure:"auto_load"`  // 是否在远程主机自动加载镜像
 }
 
 // HooksConfig Hooks配置
@@ -85,6 +86,7 @@ func setDefaults() {
 	viper.SetDefault("remote_storage.auto_cleanup", true)
 	viper.SetDefault("transfer.concurrent", 5)
 	viper.SetDefault("transfer.retry", 3)
+	viper.SetDefault("transfer.auto_load", true)
 }
 
 // Validate 验证配置的有效性
