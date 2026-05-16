@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var skipConfirm bool
+
 // transferCmd 传输命令
 var transferCmd = &cobra.Command{
 	Use:     "transfer",
@@ -27,6 +29,7 @@ var transferCmd = &cobra.Command{
   dockship transfer                    # 使用默认配置文件 config.yaml
   dockship go                          # 等同于 transfer，更简短的别名
   dockship transfer -c custom.yaml     # 使用自定义配置文件
+  dockship transfer -y                 # 跳过二次确认
   dockship go -c custom.yaml     # 使用自定义配置文件`,
 	RunE: runTransfer,
 }
@@ -34,6 +37,7 @@ var transferCmd = &cobra.Command{
 func init() {
 	// 将传输命令添加到根命令
 	rootCmd.AddCommand(transferCmd)
+	transferCmd.Flags().BoolVarP(&skipConfirm, "yes", "y", false, "跳过二次确认，直接执行")
 }
 
 // runTransfer 执行传输任务
@@ -46,7 +50,7 @@ func runTransfer(cmd *cobra.Command, args []string) error {
 	}
 
 	// 2. 显示配置信息
-	printConfigInfo(cfg)
+	printConfigInfo(cfg, skipConfirm)
 
 	// 3. 创建传输管理器
 	manager := transfer.NewManager(cfg)
@@ -60,7 +64,7 @@ func runTransfer(cmd *cobra.Command, args []string) error {
 }
 
 // printConfigInfo 打印配置信息
-func printConfigInfo(cfg *config.Config) {
+func printConfigInfo(cfg *config.Config, skipConfirm bool) {
 	fmt.Println("\n📋 配置信息：")
 	fmt.Printf("  镜像数量: %d\n", len(cfg.Images))
 	for i, image := range cfg.Images {
@@ -83,13 +87,15 @@ func printConfigInfo(cfg *config.Config) {
 	}
 	fmt.Printf("  认证方式: %s\n", authMethod)
 
-	// 确认执行
-	fmt.Print("\n⚠️  确认要继续执行吗? [y/N]: ")
-	var confirm string
-	fmt.Scanln(&confirm)
-	if confirm != "y" && confirm != "Y" {
-		fmt.Println("❌ 任务已取消")
-		os.Exit(0)
+	// 确认执行（配置开启确认且未指定 -y 时才询问）
+	if cfg.Transfer.Confirm && !skipConfirm {
+		fmt.Print("\n⚠️  确认要继续执行吗? [y/N]: ")
+		var confirm string
+		fmt.Scanln(&confirm)
+		if confirm != "y" && confirm != "Y" {
+			fmt.Println("❌ 任务已取消")
+			os.Exit(0)
+		}
 	}
 	fmt.Println()
 }

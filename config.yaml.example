@@ -31,6 +31,7 @@ transfer:
   concurrent: 5                   # 并发传输主机数量
   retry: 3                        # 失败重试次数
   auto_load: true                 # 是否在远程主机自动加载镜像
+  confirm: true                   # 执行前是否需要二次确认（可用 -y 跳过）
 
 
 # Hooks配置（对所有镜像和主机生效）

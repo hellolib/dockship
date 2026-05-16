@@ -38,6 +38,7 @@ type TransferConfig struct {
 	Concurrent int  `mapstructure:"concurrent"` // 并发传输主机数量，也用于镜像并发
 	Retry      int  `mapstructure:"retry"`      // 失败重试次数
 	AutoLoad   bool `mapstructure:"auto_load"`  // 是否在远程主机自动加载镜像
+	Confirm    bool `mapstructure:"confirm"`    // 执行前是否需要二次确认
 }
 
 // HooksConfig Hooks配置
@@ -87,6 +88,7 @@ func setDefaults() {
 	viper.SetDefault("transfer.concurrent", 5)
 	viper.SetDefault("transfer.retry", 3)
 	viper.SetDefault("transfer.auto_load", true)
+	viper.SetDefault("transfer.confirm", true)
 }
 
 // Validate 验证配置的有效性
