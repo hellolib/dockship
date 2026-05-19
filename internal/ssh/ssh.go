@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -229,8 +230,9 @@ func (c *Client) CheckDockerAvailable() error {
 // ExecuteHooks 执行hooks命令列表
 // stage: 执行阶段名称（pre_load/post_load），用于日志输出
 // commands: 要执行的命令列表
+// vars: 模板变量，命令中的 {key} 会被替换为对应值
 // 返回：是否有命令执行失败
-func (c *Client) ExecuteHooks(stage string, commands []string) bool {
+func (c *Client) ExecuteHooks(stage string, commands []string, vars map[string]string) bool {
 	if len(commands) == 0 {
 		return true // 没有命令，视为成功
 	}
@@ -239,9 +241,15 @@ func (c *Client) ExecuteHooks(stage string, commands []string) bool {
 	hasError := false
 
 	for i, command := range commands {
-		fmt.Printf("    [%s][%d/%d] 执行: %s\n", c.host, i+1, len(commands), command)
+		// 替换模板变量
+		cmd := command
+		for k, v := range vars {
+			cmd = strings.ReplaceAll(cmd, "{"+k+"}", v)
+		}
 
-		output, err := c.ExecuteCommand(command)
+		fmt.Printf("    [%s][%d/%d] 执行: %s\n", c.host, i+1, len(commands), cmd)
+
+		output, err := c.ExecuteCommand(cmd)
 		if err != nil {
 			hasError = true
 			fmt.Printf("    [%s] ❌ 失败: %v\n", c.host, err)

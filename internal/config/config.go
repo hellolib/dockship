@@ -9,13 +9,19 @@ import (
 
 // Config 全局配置结构
 type Config struct {
-	Images        []string       `mapstructure:"images"`         // 需要传输的镜像列表
+	Images        []ImageConfig  `mapstructure:"images"`         // 需要传输的镜像列表
 	TargetHosts   []string       `mapstructure:"target_hosts"`   // 目标主机列表
 	SSH           SSHConfig      `mapstructure:"ssh"`            // SSH连接配置
 	LocalStorage  StorageConfig  `mapstructure:"local_storage"`  // 本地存储配置
 	RemoteStorage StorageConfig  `mapstructure:"remote_storage"` // 远程存储配置
 	Transfer      TransferConfig `mapstructure:"transfer"`       // 传输配置
-	Hooks         HooksConfig    `mapstructure:"hooks"`          // Hooks配置
+	Hooks         HooksConfig    `mapstructure:"hooks"`          // 全局Hooks配置
+}
+
+// ImageConfig 镜像配置（支持纯字符串或带hooks的结构体）
+type ImageConfig struct {
+	Name  string      `mapstructure:"name"`  // 镜像名称
+	Hooks HooksConfig `mapstructure:"hooks"` // 镜像级Hooks配置
 }
 
 // SSHConfig SSH连接配置
@@ -62,10 +68,15 @@ func LoadConfig(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("读取配置文件失败: %w", err)
 	}
 
-	// 解析配置
+	// 解析配置（images 需要特殊处理以兼容纯字符串和结构体两种写法）
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("解析配置文件失败: %w", err)
+	}
+
+	// 手动解析images字段，兼容两种YAML写法
+	if err := parseImages(&cfg); err != nil {
+		return nil, fmt.Errorf("解析镜像配置失败: %w", err)
 	}
 
 	// 验证配置
@@ -75,6 +86,56 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	globalConfig = &cfg
 	return &cfg, nil
+}
+
+// parseImages 手动解析images字段，兼容纯字符串和结构体两种YAML写法
+func parseImages(cfg *Config) error {
+	imagesRaw := viper.Get("images")
+	if imagesRaw == nil {
+		return nil
+	}
+
+	imagesSlice, ok := imagesRaw.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	cfg.Images = make([]ImageConfig, 0, len(imagesSlice))
+	for _, item := range imagesSlice {
+		switch v := item.(type) {
+		case string:
+			// 纯字符串写法: - nginx:1.25
+			cfg.Images = append(cfg.Images, ImageConfig{Name: v})
+		case map[string]interface{}:
+			// 结构体写法:
+			//   - name: nginx:1.25
+			//     hooks:
+			//       post_load:
+			//         - ...
+			imgCfg := ImageConfig{}
+			if name, ok := v["name"].(string); ok {
+				imgCfg.Name = name
+			}
+			if hooks, ok := v["hooks"].(map[string]interface{}); ok {
+				if preLoad, ok := hooks["pre_load"].([]interface{}); ok {
+					for _, cmd := range preLoad {
+						if s, ok := cmd.(string); ok {
+							imgCfg.Hooks.PreLoad = append(imgCfg.Hooks.PreLoad, s)
+						}
+					}
+				}
+				if postLoad, ok := hooks["post_load"].([]interface{}); ok {
+					for _, cmd := range postLoad {
+						if s, ok := cmd.(string); ok {
+							imgCfg.Hooks.PostLoad = append(imgCfg.Hooks.PostLoad, s)
+						}
+					}
+				}
+			}
+			cfg.Images = append(cfg.Images, imgCfg)
+		}
+	}
+	return nil
 }
 
 // setDefaults 设置默认配置值

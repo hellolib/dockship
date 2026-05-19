@@ -67,8 +67,8 @@ func runTransfer(cmd *cobra.Command, args []string) error {
 func printConfigInfo(cfg *config.Config, skipConfirm bool) {
 	fmt.Println("\n📋 配置信息：")
 	fmt.Printf("  镜像数量: %d\n", len(cfg.Images))
-	for i, image := range cfg.Images {
-		fmt.Printf("    %d. %s\n", i+1, image)
+	for i, imageCfg := range cfg.Images {
+		fmt.Printf("    %d. %s\n", i+1, imageCfg.Name)
 	}
 	fmt.Printf("  目标主机: %d 台\n", len(cfg.TargetHosts))
 	for i, target := range cfg.TargetHosts {

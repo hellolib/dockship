@@ -1,7 +1,13 @@
-# Docker镜像列表
+# Docker镜像列表（支持纯字符串和结构体两种写法）
 images:
+  # 纯字符串写法（无镜像级hooks）
   - nginx:1.25
-  - redis:7.0
+  # 结构体写法（支持镜像级hooks和 {image} 模板变量）
+  - name: redis:7.0
+    hooks:
+      post_load:
+        # {image} 会自动替换为当前镜像名
+        # - docker service update --image {image} <服务名>
 
 # 目标主机列表
 target_hosts:
@@ -34,7 +40,8 @@ transfer:
   confirm: true                   # 执行前是否需要二次确认（可用 -y 跳过）
 
 
-# Hooks配置（对所有镜像和主机生效）
+# 全局Hooks配置（对所有镜像生效）
+# 注意：如果镜像级hooks也定义了，全局hooks先执行，镜像级hooks后执行
 hooks:
   # 镜像加载前执行（在docker load之前）
   pre_load:
@@ -45,5 +52,3 @@ hooks:
   post_load:
 #    - echo "镜像加载完成"
 #    - docker images | tail -5
-    # 示例：更新Swarm服务
-    # - docker service update --image <镜像名> <服务名>

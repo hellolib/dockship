@@ -9,7 +9,7 @@ import (
 
 // 版本信息（可以通过 ldflags 在编译时注入）
 var (
-	Version   = "v1.0.0"
+	Version   = "v1.1.0"
 	BuildTime = "unknown"
 	GitCommit = "unknown"
 	GoVersion = runtime.Version()

@@ -1,7 +1,7 @@
 .PHONY: build clean version install help
 
 # 版本信息
-VERSION := v1.0.0
+VERSION := v1.1.0
 BUILD_TIME := $(shell date +%Y-%m-%d\ %H:%M:%S)
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GO_VERSION := $(shell go version | awk '{print $$3}')

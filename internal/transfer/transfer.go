@@ -36,9 +36,9 @@ type TransferResult struct {
 }
 
 type preparedImage struct {
-	Image   string
-	TarFile string
-	Err     error
+	ImageCfg config.ImageConfig
+	TarFile  string
+	Err      error
 }
 
 type imagePipelineResult struct {
@@ -68,7 +68,7 @@ func (m *Manager) Start() error {
 		concurrency = 1
 	}
 
-	imageCh := make(chan string)
+	imageCh := make(chan config.ImageConfig)
 	preparedCh := make(chan preparedImage, imageCount)
 	resultCh := make(chan imagePipelineResult, imageCount)
 
@@ -77,12 +77,12 @@ func (m *Manager) Start() error {
 		prepareWg.Add(1)
 		go func() {
 			defer prepareWg.Done()
-			for image := range imageCh {
-				tarFile, err := m.dockerClient.PrepareImage(image)
+			for imageCfg := range imageCh {
+				tarFile, err := m.dockerClient.PrepareImage(imageCfg.Name)
 				preparedCh <- preparedImage{
-					Image:   image,
-					TarFile: tarFile,
-					Err:     err,
+					ImageCfg: imageCfg,
+					TarFile:  tarFile,
+					Err:      err,
 				}
 			}
 		}()
@@ -94,8 +94,8 @@ func (m *Manager) Start() error {
 	}()
 
 	go func() {
-		for _, image := range m.cfg.Images {
-			imageCh <- image
+		for _, imageCfg := range m.cfg.Images {
+			imageCh <- imageCfg
 		}
 		close(imageCh)
 	}()
@@ -108,7 +108,7 @@ func (m *Manager) Start() error {
 			for prepared := range preparedCh {
 				err := m.handlePreparedImage(prepared)
 				resultCh <- imagePipelineResult{
-					Image: prepared.Image,
+					Image: prepared.ImageCfg.Name,
 					Err:   err,
 				}
 			}
@@ -139,7 +139,7 @@ func (m *Manager) handlePreparedImage(prepared preparedImage) error {
 	}
 
 	if prepared.TarFile == "" {
-		return fmt.Errorf("镜像 %s 的 tar 文件不存在", prepared.Image)
+		return fmt.Errorf("镜像 %s 的 tar 文件不存在", prepared.ImageCfg.Name)
 	}
 
 	if m.cfg.LocalStorage.AutoCleanup {
@@ -150,18 +150,18 @@ func (m *Manager) handlePreparedImage(prepared preparedImage) error {
 		}(prepared.TarFile)
 	}
 
-	return m.transferPreparedImage(prepared.Image, prepared.TarFile)
+	return m.transferPreparedImage(prepared.ImageCfg, prepared.TarFile)
 }
 
-func (m *Manager) transferPreparedImage(image, tarFile string) error {
-	fmt.Printf("\n📦 处理镜像: %s\n", image)
+func (m *Manager) transferPreparedImage(imageCfg config.ImageConfig, tarFile string) error {
+	fmt.Printf("\n📦 处理镜像: %s\n", imageCfg.Name)
 	fmt.Println(strings.Repeat("-", 60))
 
 	progress := mpb.New(
 		mpb.WithRefreshRate(120 * time.Millisecond),
 	)
 
-	results := m.transferToHosts(image, tarFile, progress)
+	results := m.transferToHosts(imageCfg, tarFile, progress)
 
 	progress.Wait()
 
@@ -184,12 +184,12 @@ func (m *Manager) transferPreparedImage(image, tarFile string) error {
 		}
 	}
 
-	fmt.Printf("\n📊 镜像 %s 传输统计: 成功 %d 台，失败 %d 台\n", image, success, failed)
+	fmt.Printf("\n📊 镜像 %s 传输统计: 成功 %d 台，失败 %d 台\n", imageCfg.Name, success, failed)
 	return nil
 }
 
 // transferToHosts 并发传输到多个主机
-func (m *Manager) transferToHosts(image, tarFile string, progress *mpb.Progress) []TransferResult {
+func (m *Manager) transferToHosts(imageCfg config.ImageConfig, tarFile string, progress *mpb.Progress) []TransferResult {
 	var wg sync.WaitGroup
 	results := make([]TransferResult, len(m.cfg.TargetHosts))
 
@@ -207,7 +207,7 @@ func (m *Manager) transferToHosts(image, tarFile string, progress *mpb.Progress)
 			defer func() { <-semaphore }()
 
 			// 执行传输
-			result := m.transferToHost(targetHost, image, tarFile, progress)
+			result := m.transferToHost(targetHost, imageCfg, tarFile, progress)
 			results[index] = result
 		}(i, host)
 	}
@@ -217,16 +217,16 @@ func (m *Manager) transferToHosts(image, tarFile string, progress *mpb.Progress)
 }
 
 // transferToHost 传输镜像到单个主机（带重试）
-func (m *Manager) transferToHost(host, image, tarFile string, progress *mpb.Progress) TransferResult {
+func (m *Manager) transferToHost(host string, imageCfg config.ImageConfig, tarFile string, progress *mpb.Progress) TransferResult {
 	var lastErr error
 	maxRetries := m.cfg.Transfer.Retry
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		err := m.doTransfer(host, image, tarFile, progress)
+		err := m.doTransfer(host, imageCfg, tarFile, progress)
 		if err == nil {
 			return TransferResult{
 				Host:    host,
-				Image:   image,
+				Image:   imageCfg.Name,
 				Success: true,
 			}
 		}
@@ -239,14 +239,14 @@ func (m *Manager) transferToHost(host, image, tarFile string, progress *mpb.Prog
 
 	return TransferResult{
 		Host:    host,
-		Image:   image,
+		Image:   imageCfg.Name,
 		Success: false,
 		Error:   lastErr,
 	}
 }
 
 // doTransfer 执行实际的传输操作
-func (m *Manager) doTransfer(host, image, tarFile string, progress *mpb.Progress) error {
+func (m *Manager) doTransfer(host string, imageCfg config.ImageConfig, tarFile string, progress *mpb.Progress) error {
 	// 1. 创建SSH客户端
 	sshClient := ssh.NewClient(
 		host,
@@ -275,10 +275,16 @@ func (m *Manager) doTransfer(host, image, tarFile string, progress *mpb.Progress
 		return err
 	}
 
-	// 5. 执行pre_load hooks（镜像加载前）
+	// 5. 执行hooks（全局 + 镜像级）
+	vars := map[string]string{"image": imageCfg.Name}
+
+	// 5a. 执行全局 pre_load hooks
 	if len(m.cfg.Hooks.PreLoad) > 0 {
-		sshClient.ExecuteHooks("pre_load", m.cfg.Hooks.PreLoad)
-		// hooks失败不影响主流程，继续执行
+		sshClient.ExecuteHooks("pre_load", m.cfg.Hooks.PreLoad, vars)
+	}
+	// 5b. 执行镜像级 pre_load hooks
+	if len(imageCfg.Hooks.PreLoad) > 0 {
+		sshClient.ExecuteHooks("pre_load", imageCfg.Hooks.PreLoad, vars)
 	}
 
 	// 6. 根据配置决定是否加载Docker镜像
@@ -287,16 +293,19 @@ func (m *Manager) doTransfer(host, image, tarFile string, progress *mpb.Progress
 			return err
 		}
 
-		// 7. 执行post_load hooks（镜像加载后）
+		// 7. 执行post_load hooks（全局 + 镜像级）
+		// 7a. 执行全局 post_load hooks
 		if len(m.cfg.Hooks.PostLoad) > 0 {
-			sshClient.ExecuteHooks("post_load", m.cfg.Hooks.PostLoad)
-			// hooks失败不影响主流程，继续执行
+			sshClient.ExecuteHooks("post_load", m.cfg.Hooks.PostLoad, vars)
+		}
+		// 7b. 执行镜像级 post_load hooks
+		if len(imageCfg.Hooks.PostLoad) > 0 {
+			sshClient.ExecuteHooks("post_load", imageCfg.Hooks.PostLoad, vars)
 		}
 	}
 
 	// 8. 根据配置决定是否清理远程tar文件
 	if m.cfg.RemoteStorage.AutoCleanup {
-		// 静默清理，如果失败也不输出，错误会在后续检查时发现
 		sshClient.RemoveRemoteFile(remoteTarPath)
 	}
 

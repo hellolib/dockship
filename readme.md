@@ -18,7 +18,7 @@
 - ✅ **文件传输**：通过 SSH/SFTP 安全传输镜像包至目标主机
 - ✅ **实时进度条**：多主机并发传输时显示实时上传进度
 - ✅ **远程加载**：可选择是否在目标主机自动执行 `docker load -i`
-- ✅ **Hooks 机制**：支持镜像加载前后执行自定义命令
+- ✅ **Hooks 机制**：支持全局和镜像级 hooks，支持 `{image}` 模板变量
 - ✅ **多主机并发**：支持并行传输到多台主机，可配置并发数
 - ✅ **失败重试**：支持配置失败重试次数
 - ✅ **自动清理**：支持本地和远程临时文件自动清理
@@ -36,6 +36,9 @@
 ```bash
 git clone https://github.com/hellolib/dockship.git
 cd dockship
+# 安装到 $GOPATH/bin
+make install 
+# 或者仅编译不安装
 make build
 ```
 
@@ -80,10 +83,23 @@ make help     # 显示帮助信息
 在项目根目录创建 `config.yaml`：
 
 ```yaml
-# Docker镜像列表
+# Docker镜像列表（支持纯字符串和结构体两种写法）
 images:
+  # 纯字符串写法（无镜像级hooks）
   - nginx:1.25
-  - redis:7.0
+
+  # 结构体写法（支持镜像级hooks）
+  - name: redis:7.0
+    hooks:
+      post_load:
+        # {image} 会自动替换为当前镜像名
+        - docker service update --image {image} my-redis-service
+
+  - name: hub.deepin.com/app/api:v1.0
+    hooks:
+      post_load:
+        - docker service update --image {image} api-public
+        - docker service update --image {image} api-developer
 
 # 目标主机列表
 target_hosts:
@@ -115,7 +131,7 @@ transfer:
   retry: 3                        # 失败重试次数
   auto_load: true                 # 是否在远程主机自动加载镜像
 
-# Hooks配置（对所有镜像和主机生效）
+# Hooks配置（全局，对所有镜像生效）
 hooks:
   # 镜像加载前执行（在docker load之前）
   pre_load:
@@ -126,8 +142,6 @@ hooks:
   post_load:
     - echo "镜像加载完成"
     - docker images | tail -5
-    # 示例：更新Swarm服务
-    # - docker service update --image <镜像名> <服务名>
 ```
 
 ### 2️⃣ 执行传输
@@ -201,17 +215,60 @@ hooks:
 
 ## 🔧 Hooks 机制
 
-Hooks 允许你在镜像加载的不同阶段执行自定义命令，这对于自动化部署非常有用。
+Hooks 允许你在镜像加载的不同阶段执行自定义命令，支持**全局 hooks** 和**镜像级 hooks** 两种级别。
 
-### 使用场景
+### Hooks 级别
 
-#### 1. Docker Swarm 服务更新
+#### 全局 Hooks
+
+对所有镜像生效，适合通用的查看、日志等操作：
 
 ```yaml
 hooks:
   post_load:
-    - docker service update --image nginx:1.25 my-web-service
-    - docker service update --image redis:7.0 my-cache-service
+    - docker images | tail -5
+```
+
+#### 镜像级 Hooks
+
+每个镜像专属的 hooks，支持 `{image}` 模板变量：
+
+```yaml
+images:
+  - name: hub.deepin.com/app/api:v1.0
+    hooks:
+      post_load:
+        # {image} 会自动替换为 hub.deepin.com/app/api:v1.0
+        - docker service update --image {image} api-public
+        - docker service update --image {image} api-developer
+```
+
+**优势**：修改镜像版本时只需改 `name` 字段，hooks 中的 `{image}` 自动同步，无需多处修改。
+
+#### 执行顺序
+
+对于每个镜像，hooks 按以下顺序执行：
+
+1. 全局 `pre_load` hooks
+2. 镜像级 `pre_load` hooks
+3. 执行 `docker load`
+4. 全局 `post_load` hooks
+5. 镜像级 `post_load` hooks
+
+### 使用场景
+
+#### 1. Docker Swarm 服务更新（推荐使用镜像级 hooks）
+
+```yaml
+images:
+  - name: nginx:1.25
+    hooks:
+      post_load:
+        - docker service update --image {image} my-web-service
+  - name: redis:7.0
+    hooks:
+      post_load:
+        - docker service update --image {image} my-cache-service
 ```
 
 #### 2. 验证镜像
