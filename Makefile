@@ -25,6 +25,7 @@ build: ## 编译项目
 	@echo "   Version:    $(VERSION)"
 	@echo "   Git Commit: $(GIT_COMMIT)"
 	@echo "   Build Time: $(BUILD_TIME)"
+	@go mod tidy
 	@go build $(LDFLAGS) -o $(BINARY)
 	@echo "✅ 编译完成: ./$(BINARY)"
 
